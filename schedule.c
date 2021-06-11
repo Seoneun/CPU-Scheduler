@@ -1,52 +1,51 @@
-// 2018102150 È«¼ºÀº
-#include <stdio.h> // fopen, fgets, fclose ÇÔ¼ö°¡ ¼±¾ğµÈ Çì´õ ÆÄÀÏ
-#include <stdlib.h> // atoi ¼±¾ğµÈ Çì´õ
+#include <stdio.h> // fopen, fgets, fclose í•¨ìˆ˜ê°€ ì„ ì–¸ëœ í—¤ë” íŒŒì¼
+#include <stdlib.h> // atoi ì„ ì–¸ëœ í—¤ë”
 #include "schedule.h"
 
-// Àü¿ªº¯¼ö
-struct Queue* process_list = NULL; // txtÆÄÀÏÀÇ ÇÁ·Î¼¼½º Á¤º¸¸¦ ´ã¾ÆµÎ´Â ÀúÀåÃ¼
-struct Queue* ready_queue = NULL; // ready queue, ¸Ç ¾Õ¿¡ ÀÖ´Â ÇÁ·Î¼¼½º°¡ CPU¿¡ µé¾î°¨
-struct Queue* CPU = NULL; // ÇÁ·Î¼¼½º¸¦ ÇÒ´çÇÒ ¼ö ÀÖ´Â CPU
-int scheudling_method = -1; // ½ºÄÉÁÙ¸µ ¸Ş¼Òµå ÀúÀå 1ÀÌ¸é FCFS, 2ÀÌ¸é SJF, 3ÀÌ¸é SRTF, 4ÀÌ¸é RR
-int num_of_process = -1; // txtÆÄÀÏ¿¡ ÀûÇôÀÖ´Â ÃÑ ÇÁ·Î¼¼½ºÀÇ °³¼ö, ¸Ç Ã¹ ÁÙ¿¡ ÇØ´ç
-int time_quantum = 2; // RR¿¡ ¾²ÀÌ´Â º¯¼ö Áß time quantum¿¡ ÇØ´ç. µğÆúÆ® °ªÀ¸·Î 2·Î ¼³Á¤ÇßÁö¸¸ ¿øÇÑ´Ù¸é Ãß°¡ÀûÀ¸·Î º¯°æ °¡´É
-int usage = 0; // RR¿¡ ¾²ÀÌ´Â º¯¼ö·Î CPU¸¦ 1tick¸¸Å­ »ç¿ëÇÏ¸é ÇØ´ç CPUÀÇ usageÀÇ °ªÀÌ 1 Áõ°¡ÇÑ´Ù. usage == time_quantumÀÌ¸é context switching¹ß»ı
+// ì „ì—­ë³€ìˆ˜
+struct Queue* process_list = NULL; // txtíŒŒì¼ì˜ í”„ë¡œì„¸ìŠ¤ ì •ë³´ë¥¼ ë‹´ì•„ë‘ëŠ” ì €ì¥ì²´
+struct Queue* ready_queue = NULL; // ready queue, ë§¨ ì•ì— ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ CPUì— ë“¤ì–´ê°
+struct Queue* CPU = NULL; // í”„ë¡œì„¸ìŠ¤ë¥¼ í• ë‹¹í•  ìˆ˜ ìˆëŠ” CPU
+int scheudling_method = -1; // ìŠ¤ì¼€ì¤„ë§ ë©”ì†Œë“œ ì €ì¥ 1ì´ë©´ FCFS, 2ì´ë©´ SJF, 3ì´ë©´ SRTF, 4ì´ë©´ RR
+int num_of_process = -1; // txtíŒŒì¼ì— ì í˜€ìˆëŠ” ì´ í”„ë¡œì„¸ìŠ¤ì˜ ê°œìˆ˜, ë§¨ ì²« ì¤„ì— í•´ë‹¹
+int time_quantum = 2; // RRì— ì“°ì´ëŠ” ë³€ìˆ˜ ì¤‘ time quantumì— í•´ë‹¹. ë””í´íŠ¸ ê°’ìœ¼ë¡œ 2ë¡œ ì„¤ì •í–ˆì§€ë§Œ ì›í•œë‹¤ë©´ ì¶”ê°€ì ìœ¼ë¡œ ë³€ê²½ ê°€ëŠ¥
+int usage = 0; // RRì— ì“°ì´ëŠ” ë³€ìˆ˜ë¡œ CPUë¥¼ 1tickë§Œí¼ ì‚¬ìš©í•˜ë©´ í•´ë‹¹ CPUì˜ usageì˜ ê°’ì´ 1 ì¦ê°€í•œë‹¤. usage == time_quantumì´ë©´ context switchingë°œìƒ
 
-// µ¥ÀÌÅÍ ÀúÀåÀ» À§ÇÑ ±¸Á¶Ã¼
+// ë°ì´í„° ì €ì¥ì„ ìœ„í•œ êµ¬ì¡°ì²´
 struct Queue {
     int pid; // pid
-    int arrival; // µµÂøÇÑ ½Ã°£
-    int burst; // ÇØ´ç ÇÁ·Î¼¼½º¸¦ À§ÇØ CPU¿¡ ÇÒ´çÇØ¾ß ÇÏ´Â ½Ã°£
-    int finish; // ÇØ´ç ÇÁ·Î¼¼½º°¡ ¿Ï·áµÈ ½ÃÁ¡ÀÇ ½Ã°£
-    int first_CPU_allocated; // ÇØ´ç ÇÁ·Î¼¼½º°¡ Ã³À½À¸·Î CPU¿¡ ÇÒ´çµÈ ½Ã°£
-    struct Queue* next; // ÇØ´ç ±¸Á¶Ã¼´Â linked listÇüÅÂ, location = location->next ÇüÅÂ·Î ´ÙÀ½ µ¥ÀÌÅÍ¿¡ Á¢±ÙÇÒ ¼ö ÀÖ´Ù.
+    int arrival; // ë„ì°©í•œ ì‹œê°„
+    int burst; // í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ë¥¼ ìœ„í•´ CPUì— í• ë‹¹í•´ì•¼ í•˜ëŠ” ì‹œê°„
+    int finish; // í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëœ ì‹œì ì˜ ì‹œê°„
+    int first_CPU_allocated; // í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ ì²˜ìŒìœ¼ë¡œ CPUì— í• ë‹¹ëœ ì‹œê°„
+    struct Queue* next; // í•´ë‹¹ êµ¬ì¡°ì²´ëŠ” linked listí˜•íƒœ, location = location->next í˜•íƒœë¡œ ë‹¤ìŒ ë°ì´í„°ì— ì ‘ê·¼í•  ìˆ˜ ìˆë‹¤.
 };
 
-void allocate_CPU(int _tick); // CPU¿¡ ÇÁ·Î¼¼½º¸¦ ÇÒ´çÇÏ´Â ÇÔ¼ö, ready_queue¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º Áß °¡Àå ¾Õ¿¡ ÀÖ´Â ÇÁ·Î¼¼½º¸¦ CPU¿¡ ÇÒ´ç ±× ÈÄ ready_queue¸¦ ¾Õ´ç°Ü Á¤·ÄÇÑ´Ù.
-void insert(struct Queue* item); // ready_queue¿¡ ¼öÇàÇØ¾ß ÇÒ process¸¦ Áı¾î³Ö´Â ÇÔ¼ö
-struct Queue* search(struct Queue* q, struct Queue* item); // ÇÁ·Î¼¼½º¸¦ ¸ğ¾ÆµĞ q¶ó´Â linked list¿¡¼­ itemÀÌ¶ó´Â ÇÁ·Î¼¼½º¸¦ Ã£¾ÆÁÖ´Â ÇÔ¼ö, q¶ó´Â linked list¿¡¼­ ÇØ´çÇÏ´Â ÇÁ·Î¼¼½ºÀÇ Æ÷ÀÎÅÍ¸¦ ¹İÈ¯ÇÑ´Ù.
-void burst(struct Queue* _CPU); // CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º¸¦ ¼öÇàÇÏ´Â ÇÔ¼ö, 1tick´ç 1ÀÇ ÀÛ¾÷À» ¼öÇà
-int end_processing(struct Queue* _ready_queue, int _tick); // ¼öÇàÇØ¾ßÇÒ ÇÁ·Î¼¼½º¸¦ ´Ù ³¡³»¼­ ÇÁ·Î±×·¥À» Á¾·áÇÒÁö¸¦ °áÁ¤ÇÏ´Â ÇÔ¼ö, ´Ù¸¸ ÃÖ´ë tickÀÌ 100ÀÎ °ü°è·Î ¼öÇàÇØ¾ßÇÒ ÇÁ·Î¼¼½º¸¦ ´Ù ¼öÇàÇÏÁö ¸øÇÏ´õ¶óµµ ÇÁ·Î±×·¥ÀÌ Á¾·áµÉ ¼ö ÀÖÀ½
-void free_var(); // µ¿ÀûÇÒ´çµÈ º¯¼öµé ¸¶Áö¸·¿¡ µ¿ÀûÇØÁ¦ÇØÁÖ´Â ÇÔ¼ö, ¸Ş¸ğ¸® ´©¼ö ¹æÁö
-char* my_strtok(char* str, const char* delimiters); // char ¹®ÀÚ¿­ ¹è¿­À» splitÇØÁÖ´Â ÇÔ¼ö, delimiters¸¦ ±âÁØÀ¸·Î ¹®ÀÚ¿­À» Àß¶óÁØ´Ù.
+void allocate_CPU(int _tick); // CPUì— í”„ë¡œì„¸ìŠ¤ë¥¼ í• ë‹¹í•˜ëŠ” í•¨ìˆ˜, ready_queueì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ ì¤‘ ê°€ì¥ ì•ì— ìˆëŠ” í”„ë¡œì„¸ìŠ¤ë¥¼ CPUì— í• ë‹¹ ê·¸ í›„ ready_queueë¥¼ ì•ë‹¹ê²¨ ì •ë ¬í•œë‹¤.
+void insert(struct Queue* item); // ready_queueì— ìˆ˜í–‰í•´ì•¼ í•  processë¥¼ ì§‘ì–´ë„£ëŠ” í•¨ìˆ˜
+struct Queue* search(struct Queue* q, struct Queue* item); // í”„ë¡œì„¸ìŠ¤ë¥¼ ëª¨ì•„ë‘” që¼ëŠ” linked listì—ì„œ itemì´ë¼ëŠ” í”„ë¡œì„¸ìŠ¤ë¥¼ ì°¾ì•„ì£¼ëŠ” í•¨ìˆ˜, që¼ëŠ” linked listì—ì„œ í•´ë‹¹í•˜ëŠ” í”„ë¡œì„¸ìŠ¤ì˜ í¬ì¸í„°ë¥¼ ë°˜í™˜í•œë‹¤.
+void burst(struct Queue* _CPU); // CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ë¥¼ ìˆ˜í–‰í•˜ëŠ” í•¨ìˆ˜, 1tickë‹¹ 1ì˜ ì‘ì—…ì„ ìˆ˜í–‰
+int end_processing(struct Queue* _ready_queue, int _tick); // ìˆ˜í–‰í•´ì•¼í•  í”„ë¡œì„¸ìŠ¤ë¥¼ ë‹¤ ëë‚´ì„œ í”„ë¡œê·¸ë¨ì„ ì¢…ë£Œí• ì§€ë¥¼ ê²°ì •í•˜ëŠ” í•¨ìˆ˜, ë‹¤ë§Œ ìµœëŒ€ tickì´ 100ì¸ ê´€ê³„ë¡œ ìˆ˜í–‰í•´ì•¼í•  í”„ë¡œì„¸ìŠ¤ë¥¼ ë‹¤ ìˆ˜í–‰í•˜ì§€ ëª»í•˜ë”ë¼ë„ í”„ë¡œê·¸ë¨ì´ ì¢…ë£Œë  ìˆ˜ ìˆìŒ
+void free_var(); // ë™ì í• ë‹¹ëœ ë³€ìˆ˜ë“¤ ë§ˆì§€ë§‰ì— ë™ì í•´ì œí•´ì£¼ëŠ” í•¨ìˆ˜, ë©”ëª¨ë¦¬ ëˆ„ìˆ˜ ë°©ì§€
+char* my_strtok(char* str, const char* delimiters); // char ë¬¸ìì—´ ë°°ì—´ì„ splití•´ì£¼ëŠ” í•¨ìˆ˜, delimitersë¥¼ ê¸°ì¤€ìœ¼ë¡œ ë¬¸ìì—´ì„ ì˜ë¼ì¤€ë‹¤.
 
 void read_proc_list(const char* file_name) {
-    FILE* process_list_txt; // ÅØ½ºÆ® ÆÄÀÏ ´ãÀ» º¯¼ö ¼±¾ğ
-    process_list_txt = fopen(file_name, "r"); // ÅØ½ºÆ® ÆÄÀÏ ¿­±â
-    char process[20]; // ÃÖ´ë Å©±â°¡ 20ÀÎ charÇü ¼±¾ğ, ÀÌ°É·Î ÅØ½ºÆ® ÆÄÀÏÀÇ ¹®ÀÚ¿­À» ´ãÀ½
-    fgets(process, 20, process_list_txt); // ¸Ç À­ÁÙ(ÇÁ·Î¼¼½º °³¼ö) ÀĞ±â
-    num_of_process = atoi(process);  // ÇÁ·Î¼¼¼ö °³¼ö ÀúÀå
+    FILE* process_list_txt; // í…ìŠ¤íŠ¸ íŒŒì¼ ë‹´ì„ ë³€ìˆ˜ ì„ ì–¸
+    process_list_txt = fopen(file_name, "r"); // í…ìŠ¤íŠ¸ íŒŒì¼ ì—´ê¸°
+    char process[20]; // ìµœëŒ€ í¬ê¸°ê°€ 20ì¸ charí˜• ì„ ì–¸, ì´ê±¸ë¡œ í…ìŠ¤íŠ¸ íŒŒì¼ì˜ ë¬¸ìì—´ì„ ë‹´ìŒ
+    fgets(process, 20, process_list_txt); // ë§¨ ìœ—ì¤„(í”„ë¡œì„¸ìŠ¤ ê°œìˆ˜) ì½ê¸°
+    num_of_process = atoi(process);  // í”„ë¡œì„¸ìˆ˜ ê°œìˆ˜ ì €ì¥
     for (int i = 0; i < num_of_process; i++) {
-        fgets(process, 20, process_list_txt); // ÅØ½ºÆ®ÆÄÀÏ ÇÑ ÁÙ¾¿ ÀĞ±â
+        fgets(process, 20, process_list_txt); // í…ìŠ¤íŠ¸íŒŒì¼ í•œ ì¤„ì”© ì½ê¸°
         if (process_list == NULL) {
             process_list = malloc(sizeof(struct Queue));
-            // atoiÇÔ¼ö´Â char->int·Î º¯ÇüÇØÁÖ´Â ÇÔ¼ö, ¶ç¾î¾²±â¸¦ ±âÁØÀ¸·Î pid, µµÂø½Ã°£, ¼öÇàÇØ¾ßÇÏ´Â ½Ã°£À» process_list¿¡ ÀúÀå
+            // atoií•¨ìˆ˜ëŠ” char->intë¡œ ë³€í˜•í•´ì£¼ëŠ” í•¨ìˆ˜, ë„ì–´ì“°ê¸°ë¥¼ ê¸°ì¤€ìœ¼ë¡œ pid, ë„ì°©ì‹œê°„, ìˆ˜í–‰í•´ì•¼í•˜ëŠ” ì‹œê°„ì„ process_listì— ì €ì¥
             process_list->pid = atoi(my_strtok(process," "));
             process_list->arrival = atoi(my_strtok(NULL, " "));
             process_list->burst = atoi(my_strtok(NULL, " "));
-            process_list->finish = -1; // ÇÁ·Î¼¼½º ¿Ï·á ½ÃÁ¡, ¿Ï·áµÇÁö ¾ÊÀº ÃÊ±â°ªÀº -1·Î ¼³Á¤
-            process_list->first_CPU_allocated = -1; // ÇÁ·Î¼¼½º°¡ Ã³À½À¸·Î CPU¿¡ ÇÒ´çµÈ ½ÃÁ¡, ÇÒ´çµÈ Àû ¾ø´Â ÃÊ±â°ªÀº -1·Î ¼³Á¤
-            process_list->next = NULL; // next°¡ NULLÀÌ¸é queue¿¡¼­ ¸¶Áö¸· ¿ø¼Ò¶ó´Â °ÍÀ» ¶æÇÔ
+            process_list->finish = -1; // í”„ë¡œì„¸ìŠ¤ ì™„ë£Œ ì‹œì , ì™„ë£Œë˜ì§€ ì•Šì€ ì´ˆê¸°ê°’ì€ -1ë¡œ ì„¤ì •
+            process_list->first_CPU_allocated = -1; // í”„ë¡œì„¸ìŠ¤ê°€ ì²˜ìŒìœ¼ë¡œ CPUì— í• ë‹¹ëœ ì‹œì , í• ë‹¹ëœ ì  ì—†ëŠ” ì´ˆê¸°ê°’ì€ -1ë¡œ ì„¤ì •
+            process_list->next = NULL; // nextê°€ NULLì´ë©´ queueì—ì„œ ë§ˆì§€ë§‰ ì›ì†Œë¼ëŠ” ê²ƒì„ ëœ»í•¨
         }
         else {
             struct Queue* location = process_list;
@@ -65,7 +64,7 @@ void read_proc_list(const char* file_name) {
 }
 
 void set_schedule(int method) {
-    scheudling_method = method; // ½ºÄÉÁì¸µ ¸Ş¼Òµå Á¤ÇÏ±â, 1ÀÌ¸é FCFS, 2ÀÌ¸é SJF, 3ÀÌ¸é SRTF, 4ÀÌ¸é RR
+    scheudling_method = method; // ìŠ¤ì¼€ì¥´ë§ ë©”ì†Œë“œ ì •í•˜ê¸°, 1ì´ë©´ FCFS, 2ì´ë©´ SJF, 3ì´ë©´ SRTF, 4ì´ë©´ RR
     if (scheudling_method == 1) {
         printf("Scheudling method: FCFS: First Come First Served (Non-preemptive)\n\n");
     }
@@ -82,12 +81,12 @@ void set_schedule(int method) {
 
 
 int do_schedule(int tick) {
-    if (!end_processing(ready_queue, tick)) { // ½ºÄÉÁìÀ» ½ÃÀÛÇÒ ¶§, ¼öÇàÇØ¾ßÇÒ ÇÁ·Î¼¼½º°¡ ´Ù ¼öÇàµÆ´ÂÁö¸¦ °Ë»ç, ¼öÇàµÆÀ¸¸é ÇÁ·Î±×·¥ Á¾·á
+    if (!end_processing(ready_queue, tick)) { // ìŠ¤ì¼€ì¥´ì„ ì‹œì‘í•  ë•Œ, ìˆ˜í–‰í•´ì•¼í•  í”„ë¡œì„¸ìŠ¤ê°€ ë‹¤ ìˆ˜í–‰ëëŠ”ì§€ë¥¼ ê²€ì‚¬, ìˆ˜í–‰ëìœ¼ë©´ í”„ë¡œê·¸ë¨ ì¢…ë£Œ
         return 0;
     }
 
-    struct Queue* location = process_list; // process_list¸¦ ÀĞÀ» ±¸Á¶Ã¼ ¼±¾ğ
-    // ¸ÕÀú ÇØ´ç tick¿¡¼­ µµÂøÇÑ process°¡ ÀÖ´ÂÁö¸¦ °Ë»ç, µµÂøÇÑ °ÍÀÌ ÀÖ´Ù¸é ¸í½Ã ÈÄ, InsertÇÔ¼ö¸¦ ÅëÇØ ready_queue¿¡ ÇØ´ç process ÇÒ´ç
+    struct Queue* location = process_list; // process_listë¥¼ ì½ì„ êµ¬ì¡°ì²´ ì„ ì–¸
+    // ë¨¼ì € í•´ë‹¹ tickì—ì„œ ë„ì°©í•œ processê°€ ìˆëŠ”ì§€ë¥¼ ê²€ì‚¬, ë„ì°©í•œ ê²ƒì´ ìˆë‹¤ë©´ ëª…ì‹œ í›„, Insertí•¨ìˆ˜ë¥¼ í†µí•´ ready_queueì— í•´ë‹¹ process í• ë‹¹
     while (location != NULL) {
         if (tick == location->arrival) {
             insert(location);
@@ -98,104 +97,104 @@ int do_schedule(int tick) {
 
     // FCFS
     if (scheudling_method == 1) {
-        if (CPU == NULL) { // CPU°¡ ºñ¾îÀÖ°í ready_queue¿¡ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é allocate_CPU¸¦ ÅëÇØ ready_queue¿¡ ÀÖ´Â ¸Ç ¾ÕÀÇ ÇÁ·Î¼¼½º¸¦ CPU¿¡ ÇÒ´ç ÈÄ, ÇÁ·Î¼¼½º ¼öÇà(burst)
+        if (CPU == NULL) { // CPUê°€ ë¹„ì–´ìˆê³  ready_queueì— í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ allocate_CPUë¥¼ í†µí•´ ready_queueì— ìˆëŠ” ë§¨ ì•ì˜ í”„ë¡œì„¸ìŠ¤ë¥¼ CPUì— í• ë‹¹ í›„, í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰(burst)
             if (ready_queue != NULL) {
                 allocate_CPU(tick);
                 burst(CPU);
             }
-            else { // CPU°¡ ºñ¾ú¾îµµ ÇÒ´çÇÒ process°¡ ¾ø´Ù¸é ³Ñ¾î°¡±â(CPU ÈŞ½Ä)
+            else { // CPUê°€ ë¹„ì—ˆì–´ë„ í• ë‹¹í•  processê°€ ì—†ë‹¤ë©´ ë„˜ì–´ê°€ê¸°(CPU íœ´ì‹)
                 return 1;
             }
         }
         else {
-            if (CPU->burst == 0 && ready_queue != NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆ°í ¼öÇàÇÒ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+            if (CPU->burst == 0 && ready_queue != NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëê³  ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 allocate_CPU(tick);
                 burst(CPU);
             }
-            else if (CPU->burst == 0 && ready_queue == NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆ°í ¼öÇàÇÒ ÇÁ·Î¼¼½º°¡ ¾ø´Ù¸é CPU¿¡ ÀÖ´Â ÇÁ·Î¼¼½º ²¨³»°í CPU ÈŞ½Ä
+            else if (CPU->burst == 0 && ready_queue == NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëê³  ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ê°€ ì—†ë‹¤ë©´ CPUì— ìˆëŠ” í”„ë¡œì„¸ìŠ¤ êº¼ë‚´ê³  CPU íœ´ì‹
                 allocate_CPU(tick);
                 return 1;
             }
-            else { // CPU¿¡ ÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÇÁö ¾Ê¾Ò´Ù¸é ÇÁ·Î¼¼½º °è¼ÓÇØ¼­ ¼öÇà
+            else { // CPUì— ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œë˜ì§€ ì•Šì•˜ë‹¤ë©´ í”„ë¡œì„¸ìŠ¤ ê³„ì†í•´ì„œ ìˆ˜í–‰
                 burst(CPU);
             }
         }
     }
     // SJF
-    // FCFS¿Í ¼öÇà¹æ¹ıÀº ºñ½ÁÇÔ, ´Ù¸¸ Insert ÇÔ¼ö¸¦ º¸¸é FCFS´Â unsorted linked listÀÎ ¹İ¸é, SJF´Â sorted linked listÀÓ
+    // FCFSì™€ ìˆ˜í–‰ë°©ë²•ì€ ë¹„ìŠ·í•¨, ë‹¤ë§Œ Insert í•¨ìˆ˜ë¥¼ ë³´ë©´ FCFSëŠ” unsorted linked listì¸ ë°˜ë©´, SJFëŠ” sorted linked listì„
     else if (scheudling_method == 2) {
-        if (CPU == NULL) { // CPU°¡ ºñ¾îÀÖ°í ready_queue¿¡ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é allocate_CPU¸¦ ÅëÇØ ready_queue¿¡ ÀÖ´Â ¸Ç ¾ÕÀÇ ÇÁ·Î¼¼½º¸¦ CPU¿¡ ÇÒ´ç ÈÄ, ÇÁ·Î¼¼½º ¼öÇà(burst)
+        if (CPU == NULL) { // CPUê°€ ë¹„ì–´ìˆê³  ready_queueì— í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ allocate_CPUë¥¼ í†µí•´ ready_queueì— ìˆëŠ” ë§¨ ì•ì˜ í”„ë¡œì„¸ìŠ¤ë¥¼ CPUì— í• ë‹¹ í›„, í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰(burst)
             allocate_CPU(tick);
             burst(CPU);
         }
         else {
-            if (CPU->burst == 0 && ready_queue != NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆ°í ¼öÇàÇÒ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+            if (CPU->burst == 0 && ready_queue != NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëê³  ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 allocate_CPU(tick);
                 burst(CPU);
             }
-            else { // CPU¿¡ ÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÇÁö ¾Ê¾Ò´Ù¸é ÇÁ·Î¼¼½º °è¼ÓÇØ¼­ ¼öÇà
+            else { // CPUì— ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œë˜ì§€ ì•Šì•˜ë‹¤ë©´ í”„ë¡œì„¸ìŠ¤ ê³„ì†í•´ì„œ ìˆ˜í–‰
                 burst(CPU);
             }
         }
     }
     // SRTF
     else if (scheudling_method == 3) {
-        if (CPU == NULL) { // CPU°¡ ºñ¾îÀÖ°í ready_queue¿¡ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é allocate_CPU¸¦ ÅëÇØ ready_queue¿¡ ÀÖ´Â ¸Ç ¾ÕÀÇ ÇÁ·Î¼¼½º¸¦ CPU¿¡ ÇÒ´ç ÈÄ, ÇÁ·Î¼¼½º ¼öÇà(burst)
+        if (CPU == NULL) { // CPUê°€ ë¹„ì–´ìˆê³  ready_queueì— í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ allocate_CPUë¥¼ í†µí•´ ready_queueì— ìˆëŠ” ë§¨ ì•ì˜ í”„ë¡œì„¸ìŠ¤ë¥¼ CPUì— í• ë‹¹ í›„, í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰(burst)
             allocate_CPU(tick);
             burst(CPU);
         }
         else {
             if (CPU->burst != 0) {
-                if (ready_queue != NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·á´Â ¾È µÆÁö¸¸ ¼öÇàÇÒ ÇÁ·Î¼¼½º Áß ¼öÇà½Ã°£ÀÌ ÇöÀç CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½ºÀÇ ³²Àº ¼öÇà½Ã°£º¸´Ù ÀÛÀº ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+                if (ready_queue != NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£ŒëŠ” ì•ˆ ëì§€ë§Œ ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ ì¤‘ ìˆ˜í–‰ì‹œê°„ì´ í˜„ì¬ CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ì˜ ë‚¨ì€ ìˆ˜í–‰ì‹œê°„ë³´ë‹¤ ì‘ì€ í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                     if (ready_queue->burst < CPU->burst) {
                         insert(CPU);
                         allocate_CPU(tick);
                         burst(CPU);
-                    } // À§¿¡ °æ¿ìÀÇ ÇÁ·Î¼¼½º°¡ ¾ø´Ù¸é CPU¿¡ ÇÒ´çµÇ¾î ÀÖ´Â ÇÁ·Î¼¼½º ¼öÇà
+                    } // ìœ„ì— ê²½ìš°ì˜ í”„ë¡œì„¸ìŠ¤ê°€ ì—†ë‹¤ë©´ CPUì— í• ë‹¹ë˜ì–´ ìˆëŠ” í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                     else {
                         burst(CPU);
                     }
                 }
-                else { // À§¿¡ °æ¿ìÀÇ ÇÁ·Î¼¼½º°¡ ¾ø´Ù¸é CPU¿¡ ÇÒ´çµÇ¾î ÀÖ´Â ÇÁ·Î¼¼½º ¼öÇà
+                else { // ìœ„ì— ê²½ìš°ì˜ í”„ë¡œì„¸ìŠ¤ê°€ ì—†ë‹¤ë©´ CPUì— í• ë‹¹ë˜ì–´ ìˆëŠ” í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                     burst(CPU);
                 }
-            } else if (CPU->burst == 0 && ready_queue != NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆ°í ¼öÇàÇÒ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+            } else if (CPU->burst == 0 && ready_queue != NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëê³  ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 allocate_CPU(tick);
                 burst(CPU);
             }
-            else { // À§¿¡ °æ¿ìÀÇ ÇÁ·Î¼¼½º°¡ ¾ø´Ù¸é CPU¿¡ ÇÒ´çµÇ¾î ÀÖ´Â ÇÁ·Î¼¼½º ¼öÇà
+            else { // ìœ„ì— ê²½ìš°ì˜ í”„ë¡œì„¸ìŠ¤ê°€ ì—†ë‹¤ë©´ CPUì— í• ë‹¹ë˜ì–´ ìˆëŠ” í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 burst(CPU);
             }
         }
     }
     // RR
     else if (scheudling_method == 4) {
-        if (CPU == NULL) { // CPU°¡ ºñ¾îÀÖ°í ready_queue¿¡ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é allocate_CPU¸¦ ÅëÇØ ready_queue¿¡ ÀÖ´Â ¸Ç ¾ÕÀÇ ÇÁ·Î¼¼½º¸¦ CPU¿¡ ÇÒ´ç ÈÄ, ÇÁ·Î¼¼½º ¼öÇà(burst)
+        if (CPU == NULL) { // CPUê°€ ë¹„ì–´ìˆê³  ready_queueì— í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ allocate_CPUë¥¼ í†µí•´ ready_queueì— ìˆëŠ” ë§¨ ì•ì˜ í”„ë¡œì„¸ìŠ¤ë¥¼ CPUì— í• ë‹¹ í›„, í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰(burst)
             allocate_CPU(tick);
             burst(CPU);
             usage++;
         }
         else {
-            if (CPU->burst != 0 && usage < time_quantum) { // CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º°¡ ¾È·áµÇÁö ¾Ê¾Ò°í »ç¿ë·®(usage)°¡ ÇÑ°è·®(time_quantum)À» ³Ñ¾î¼­Áö ¾ÊÀ¸¸é CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º ¼öÇà
+            if (CPU->burst != 0 && usage < time_quantum) { // CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ê°€ ì•ˆë£Œë˜ì§€ ì•Šì•˜ê³  ì‚¬ìš©ëŸ‰(usage)ê°€ í•œê³„ëŸ‰(time_quantum)ì„ ë„˜ì–´ì„œì§€ ì•Šìœ¼ë©´ CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 burst(CPU);
-                usage++; // »ç¿ë·® 1Ãß°¡(=»ç¿ëÇÒ ¼ö ÀÖ´Â ¾ç 1 Â÷°¨)
+                usage++; // ì‚¬ìš©ëŸ‰ 1ì¶”ê°€(=ì‚¬ìš©í•  ìˆ˜ ìˆëŠ” ì–‘ 1 ì°¨ê°)
             }
-            else if (CPU->burst == 0 && ready_queue != NULL) { // CPU¿¡ µé¾îÀÖ´Â ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆ°í ¼öÇàÇÒ ÇÁ·Î¼¼½º°¡ ÀÖ´Ù¸é context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+            else if (CPU->burst == 0 && ready_queue != NULL) { // CPUì— ë“¤ì–´ìˆëŠ” í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëê³  ìˆ˜í–‰í•  í”„ë¡œì„¸ìŠ¤ê°€ ìˆë‹¤ë©´ context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 allocate_CPU(tick);
-                usage = 0; // »ç¿ë·® ÃÊ±âÈ­
+                usage = 0; // ì‚¬ìš©ëŸ‰ ì´ˆê¸°í™”
                 burst(CPU);
-                usage++; // »ç¿ë·® 1Ãß°¡(=»ç¿ëÇÒ ¼ö ÀÖ´Â ¾ç 1 Â÷°¨)
+                usage++; // ì‚¬ìš©ëŸ‰ 1ì¶”ê°€(=ì‚¬ìš©í•  ìˆ˜ ìˆëŠ” ì–‘ 1 ì°¨ê°)
             }
-            else if (usage == time_quantum) { // »ç¿ë·®À» ´Ù ½èÀ» ¶§ ready_queue¿¡ CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º ³Ö¾îÁÖ°í context switchingÀ» ÁøÇà ÈÄ ÇÁ·Î¼¼½º ¼öÇà
+            else if (usage == time_quantum) { // ì‚¬ìš©ëŸ‰ì„ ë‹¤ ì¼ì„ ë•Œ ready_queueì— CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ ë„£ì–´ì£¼ê³  context switchingì„ ì§„í–‰ í›„ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 insert(CPU);
                 allocate_CPU(tick);
-                usage = 0; // »ç¿ë·® ÃÊ±âÈ­
+                usage = 0; // ì‚¬ìš©ëŸ‰ ì´ˆê¸°í™”
                 burst(CPU);
-                usage++; // »ç¿ë·® 1Ãß°¡(=»ç¿ëÇÒ ¼ö ÀÖ´Â ¾ç 1 Â÷°¨)
+                usage++; // ì‚¬ìš©ëŸ‰ 1ì¶”ê°€(=ì‚¬ìš©í•  ìˆ˜ ìˆëŠ” ì–‘ 1 ì°¨ê°)
             }
-            else { // »ç¿ë·®µµ ´Ù ¾È ›§°í CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º°¡ ´Ù ¾È ³¡³µ´Ù¸é CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º ¼öÇà
+            else { // ì‚¬ìš©ëŸ‰ë„ ë‹¤ ì•ˆ Â›ã CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ê°€ ë‹¤ ì•ˆ ëë‚¬ë‹¤ë©´ CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰
                 burst(CPU);
-                usage++; // »ç¿ë·® 1Ãß°¡(=»ç¿ëÇÒ ¼ö ÀÖ´Â ¾ç 1 Â÷°¨)
+                usage++; // ì‚¬ìš©ëŸ‰ 1ì¶”ê°€(=ì‚¬ìš©í•  ìˆ˜ ìˆëŠ” ì–‘ 1 ì°¨ê°)
             }
         }
     }
@@ -203,11 +202,11 @@ int do_schedule(int tick) {
     return 1;
 }
 
-// ¼öÇà °á°ú¸¦ º¸¿©ÁÖ´Â ÇÔ¼ö
+// ìˆ˜í–‰ ê²°ê³¼ë¥¼ ë³´ì—¬ì£¼ëŠ” í•¨ìˆ˜
 void print_performance() {
-    float sum_turn_around_time = 0.0; // °¢ ÇÁ·Î»õ½º µéÀÇ Turn around timeÀ» ÃÑÇÕÇÑ º¯¼ö
-    float sum_waiting_time = 0.0; // °¢ ÇÁ·Î»õ½º µéÀÇ Waiting timeÀ» ÃÑÇÕÇÑ º¯¼ö
-    float sum_responss_time = 0.0; // °¢ ÇÁ·Î»õ½º µéÀÇ Response timeÀ» ÃÑÇÕÇÑ º¯¼ö
+    float sum_turn_around_time = 0.0; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Turn around timeì„ ì´í•©í•œ ë³€ìˆ˜
+    float sum_waiting_time = 0.0; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Waiting timeì„ ì´í•©í•œ ë³€ìˆ˜
+    float sum_responss_time = 0.0; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Response timeì„ ì´í•©í•œ ë³€ìˆ˜
 
     printf("==============================================================================\n");
     printf("  PID  arrival  finish  burst  Turn around time  Waiting time  Response tiem\n");
@@ -218,29 +217,29 @@ void print_performance() {
         int turn_around_time = location->finish - location->arrival; // finish tick - arrival tick
         int waiting_time = location->finish - location->arrival - location->burst; // finish tick - arrival tick - burst tick
         int responss_time = location->first_CPU_allocated - location->arrival; // first tick the CPU was first allocated - arrival tick
-        sum_turn_around_time += turn_around_time; // °¢ ÇÁ·Î»õ½º µéÀÇ Turn around timeÀ» ´õÈû
-        sum_waiting_time += waiting_time; // °¢ ÇÁ·Î»õ½º µéÀÇ Waiting timeÀ» ´õÇÔ
-        sum_responss_time += responss_time; // °¢ ÇÁ·Î»õ½º µéÀÇ Response timeÀ» ´õÇÔ
+        sum_turn_around_time += turn_around_time; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Turn around timeì„ ë”í˜
+        sum_waiting_time += waiting_time; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Waiting timeì„ ë”í•¨
+        sum_responss_time += responss_time; // ê° í”„ë¡œìƒˆìŠ¤ ë“¤ì˜ Response timeì„ ë”í•¨
         printf("  %2d     %2d       %2d     %2d          %2d               %2d             %2d\n", location->pid, location->arrival, location->finish, location->burst, turn_around_time, waiting_time, responss_time);
         location = location->next;
     }
 
     printf("------------------------------------------------------------------------------\n");
-    printf(" average:                           %0.2f              %0.2f           %0.2f\n", sum_turn_around_time / num_of_process, sum_waiting_time / num_of_process, sum_responss_time / num_of_process); // °¢ º¯¼öµé Æò±Õ
+    printf(" average:                           %0.2f              %0.2f           %0.2f\n", sum_turn_around_time / num_of_process, sum_waiting_time / num_of_process, sum_responss_time / num_of_process); // ê° ë³€ìˆ˜ë“¤ í‰ê· 
     printf("==============================================================================");
 
-    free_var(); // µ¿ÀûÇÒ´ç ÇØÁ¦, ¸Ş¸ğ¸® ´©¼ö ¹æÁö
+    free_var(); // ë™ì í• ë‹¹ í•´ì œ, ë©”ëª¨ë¦¬ ëˆ„ìˆ˜ ë°©ì§€
 }
 
-// CPU¿¡ ÇÁ·Î¼¼½º ÇÒ´çÇÏ´Â ÇÔ¼ö, ÇÒ´çÇÑ ÇÁ·Î¼¼½º´Â ready_queue¿¡¼­ °¡Á®¿Â´Ù.
+// CPUì— í”„ë¡œì„¸ìŠ¤ í• ë‹¹í•˜ëŠ” í•¨ìˆ˜, í• ë‹¹í•œ í”„ë¡œì„¸ìŠ¤ëŠ” ready_queueì—ì„œ ê°€ì ¸ì˜¨ë‹¤.
 void allocate_CPU(int _tick) {
-    if (CPU != NULL) { // CPU°¡ ºñ¾îÀÖÁö ¾Ê¾ÒÀ» »óÅÂÀÏ ¶§ context switchingÀÌ ¹ß»ıÇÏ´Â °æ¿ì, ÇØ´ç ÇÁ·Î¼¼½º°¡ ¿Ï·áµÆÀ¸¸é ¿Ï·áµÈ ½Ã°£ ÀúÀå
+    if (CPU != NULL) { // CPUê°€ ë¹„ì–´ìˆì§€ ì•Šì•˜ì„ ìƒíƒœì¼ ë•Œ context switchingì´ ë°œìƒí•˜ëŠ” ê²½ìš°, í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ ì™„ë£Œëìœ¼ë©´ ì™„ë£Œëœ ì‹œê°„ ì €ì¥
         struct Queue* location = search(process_list, CPU);
-        if(location->finish == -1 && CPU->burst == 0) // ÇÁ·Î¼¼½º ¿Ï·áµÈ ½Ã°£ Áßº¹ ÀúÀå ¹æÁö
+        if(location->finish == -1 && CPU->burst == 0) // í”„ë¡œì„¸ìŠ¤ ì™„ë£Œëœ ì‹œê°„ ì¤‘ë³µ ì €ì¥ ë°©ì§€
             location->finish = _tick;
     }
 
-    if (ready_queue != NULL) { // ready_queue°¡ ºñ¾îÀÖÁö ¾ÊÀ» ¶§ CPU¿¡ ÇÁ·Î¼¼½º ÇÒ´ç °¡´É
+    if (ready_queue != NULL) { // ready_queueê°€ ë¹„ì–´ìˆì§€ ì•Šì„ ë•Œ CPUì— í”„ë¡œì„¸ìŠ¤ í• ë‹¹ ê°€ëŠ¥
         CPU = malloc(sizeof(struct Queue));
         CPU->pid = ready_queue->pid;
         CPU->arrival = ready_queue->arrival;
@@ -249,10 +248,10 @@ void allocate_CPU(int _tick) {
         CPU->first_CPU_allocated = ready_queue->first_CPU_allocated;
         CPU->next = NULL;
 
-        ready_queue = ready_queue->next; // ¸Ç ¾ÕÀÌ ºüÁ®³ª°¡´Ï ¾Õ´ç±è
+        ready_queue = ready_queue->next; // ë§¨ ì•ì´ ë¹ ì ¸ë‚˜ê°€ë‹ˆ ì•ë‹¹ê¹€
         printf("[tick: %02d] Dispatch to Process (ID: %d)\n", _tick, CPU->pid);
 
-        if (CPU->first_CPU_allocated == -1) { // ÇØ´ç ÇÁ·Î¼¼½º°¡ CPU¿¡ ÇÒ´çµÈ ÀÌ·ÂÀÌ ¾øÀ¸¸é ÇØ´ç ÇÁ·Î¼¼½º°¡ CPU¿¡ ÇÒ´çµÇ´Â ÇöÀç tickÀ» ÀúÀå
+        if (CPU->first_CPU_allocated == -1) { // í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ CPUì— í• ë‹¹ëœ ì´ë ¥ì´ ì—†ìœ¼ë©´ í•´ë‹¹ í”„ë¡œì„¸ìŠ¤ê°€ CPUì— í• ë‹¹ë˜ëŠ” í˜„ì¬ tickì„ ì €ì¥
             struct Queue* location = search(process_list, CPU);
             location->first_CPU_allocated = _tick;
             CPU->first_CPU_allocated = _tick;
@@ -260,9 +259,9 @@ void allocate_CPU(int _tick) {
     }
 }
 
-// ready_queue¿¡ ÇÁ·Î¼¼½º¸¦ ³Ö´Â ÇÔ¼ö, ½ºÄÉÁì method¿¡ µû¶ó ³Ö´Â ¾Ë°í¸®ÁòÀÌ »óÀÌ, FCFS¿Í RRÀº Á¤·ÄÇÏÁö ¾Ê°í ÇÁ·Î¼¼½º¸¦ ³Ö°í, SJF, SRTF´Â ¿À¸§Â÷¼ø Á¤·Ä·Î ready_queue¿¡ ÇÁ·Î¼¼½º ÀúÀå
+// ready_queueì— í”„ë¡œì„¸ìŠ¤ë¥¼ ë„£ëŠ” í•¨ìˆ˜, ìŠ¤ì¼€ì¥´ methodì— ë”°ë¼ ë„£ëŠ” ì•Œê³ ë¦¬ì¦˜ì´ ìƒì´, FCFSì™€ RRì€ ì •ë ¬í•˜ì§€ ì•Šê³  í”„ë¡œì„¸ìŠ¤ë¥¼ ë„£ê³ , SJF, SRTFëŠ” ì˜¤ë¦„ì°¨ìˆœ ì •ë ¬ë¡œ ready_queueì— í”„ë¡œì„¸ìŠ¤ ì €ì¥
 void insert(struct Queue* item) {
-    if (ready_queue == NULL) { // ready_queue°¡ ºñ¾î ÀÖÀ¸¸é Á¤·ÄÀÌµç ¾Æ´Ïµç ready_queue ¸Ç ¾Õ¿¡´Ù ÇÁ·Î¼¼½º¸¦ ³Ö´Â´Ù.
+    if (ready_queue == NULL) { // ready_queueê°€ ë¹„ì–´ ìˆìœ¼ë©´ ì •ë ¬ì´ë“  ì•„ë‹ˆë“  ready_queue ë§¨ ì•ì—ë‹¤ í”„ë¡œì„¸ìŠ¤ë¥¼ ë„£ëŠ”ë‹¤.
         ready_queue = malloc(sizeof(struct Queue));
         ready_queue->pid = item->pid;
         ready_queue->arrival = item->arrival;
@@ -273,9 +272,9 @@ void insert(struct Queue* item) {
         return;
     }
 
-    struct Queue* location = ready_queue; // ready_queue¸¦ µ¹¾Æ´Ù´Ï¸ç ÀúÀå¿¡ ÇÊ¿äÇÑ º¯¼ö
-    if (scheudling_method == 1 || scheudling_method == 4) { // ºñÁ¤·Ä ³Ö±â
-        while (location->next != NULL) { // ¸Ç ¸¶Áö¸·¿¡ ÇÁ·Î¼¼½º¸¦ ÀúÀåÇÑ´Ù.
+    struct Queue* location = ready_queue; // ready_queueë¥¼ ëŒì•„ë‹¤ë‹ˆë©° ì €ì¥ì— í•„ìš”í•œ ë³€ìˆ˜
+    if (scheudling_method == 1 || scheudling_method == 4) { // ë¹„ì •ë ¬ ë„£ê¸°
+        while (location->next != NULL) { // ë§¨ ë§ˆì§€ë§‰ì— í”„ë¡œì„¸ìŠ¤ë¥¼ ì €ì¥í•œë‹¤.
             location = location->next;
         }
         location->next = malloc(sizeof(struct Queue));
@@ -286,9 +285,9 @@ void insert(struct Queue* item) {
         location->next->first_CPU_allocated = item->first_CPU_allocated;
         location->next->next = NULL;
     }
-    else if (scheudling_method == 2 || scheudling_method == 3) { // Á¤·Ä ³Ö±â
+    else if (scheudling_method == 2 || scheudling_method == 3) { // ì •ë ¬ ë„£ê¸°
         if(location != NULL) {
-            if (location->burst > item->burst) { // ¿À¸§Â÷¼øÀ¸·Î ÇÁ·Î¼¼½º ÀúÀå, ÀúÀå À§Ä¡°¡ Áß°£ÂëÀÌ¶ó¸é ±× »çÀÌ ºñÁı°í µé¾î°¡ ¼­·Î¸¦ ÀÖ´Â ÀÛ¾÷ ¼öÇà
+            if (location->burst > item->burst) { // ì˜¤ë¦„ì°¨ìˆœìœ¼ë¡œ í”„ë¡œì„¸ìŠ¤ ì €ì¥, ì €ì¥ ìœ„ì¹˜ê°€ ì¤‘ê°„ì¯¤ì´ë¼ë©´ ê·¸ ì‚¬ì´ ë¹„ì§‘ê³  ë“¤ì–´ê°€ ì„œë¡œë¥¼ ìˆëŠ” ì‘ì—… ìˆ˜í–‰
                 ready_queue = malloc(sizeof(struct Queue));
                 ready_queue->pid = item->pid;
                 ready_queue->arrival = item->arrival;
@@ -328,7 +327,7 @@ void insert(struct Queue* item) {
     }
 }
 
-// q¶ó´Â linked list¿¡¼­ itemÀÌ¶ó´Â ÇÁ·Î¼¼½º¸¦ Ã£¾Æ q¿¡¼­ item¿¡ ÇØ´çÇÏ´Â ÇÁ·Î¼¼½ºÀÇ Æ÷ÀÎÅÍ¸¦ ¹İÈ¯ÇÏ´Â ÇÔ¼ö
+// që¼ëŠ” linked listì—ì„œ itemì´ë¼ëŠ” í”„ë¡œì„¸ìŠ¤ë¥¼ ì°¾ì•„ qì—ì„œ itemì— í•´ë‹¹í•˜ëŠ” í”„ë¡œì„¸ìŠ¤ì˜ í¬ì¸í„°ë¥¼ ë°˜í™˜í•˜ëŠ” í•¨ìˆ˜
 struct Queue* search(struct Queue* q, struct Queue* item) {
     struct Queue* location = q;
     while (location->pid != item->pid) {
@@ -337,25 +336,25 @@ struct Queue* search(struct Queue* q, struct Queue* item) {
     return location;
 }
 
-// CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º ¼öÇàÇÏ´Â ÇÔ¼ö
+// CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ ìˆ˜í–‰í•˜ëŠ” í•¨ìˆ˜
 void burst(struct Queue* _CPU) {
-    if (_CPU != NULL) { // CPU°¡ ºñ¾îÀÖÁö ¾ÊÀ» °æ¿ì¿¡ ¼öÇà
+    if (_CPU != NULL) { // CPUê°€ ë¹„ì–´ìˆì§€ ì•Šì„ ê²½ìš°ì— ìˆ˜í–‰
         if (_CPU->burst > 0)
             _CPU->burst--;
     }
 }
 
-// ÇÁ·Î±×·¥ Á¾·á ¿©ºÎ ÆÇ´Ü ÇÔ¼ö, ÅØ½ºÆ® ÆÄÀÏ¿¡ ÀÖ´ø ÇÁ·Î¼¼½ºµé ¸ğµÎ ¼öÇàÀÌ ¿Ï·áµÇ¸é ÇÁ·Î±×·¥ Á¾·á(return 0), ¾Æ´Ï¸é °è¼ÓÇØ¼­ ÇÁ·Î±×·¥ ÀçÀç(return 1)
+// í”„ë¡œê·¸ë¨ ì¢…ë£Œ ì—¬ë¶€ íŒë‹¨ í•¨ìˆ˜, í…ìŠ¤íŠ¸ íŒŒì¼ì— ìˆë˜ í”„ë¡œì„¸ìŠ¤ë“¤ ëª¨ë‘ ìˆ˜í–‰ì´ ì™„ë£Œë˜ë©´ í”„ë¡œê·¸ë¨ ì¢…ë£Œ(return 0), ì•„ë‹ˆë©´ ê³„ì†í•´ì„œ í”„ë¡œê·¸ë¨ ì¬ì¬(return 1)
 int end_processing(struct Queue* _ready_queue, int _tick) {
     if (CPU != NULL) {
-        if (_ready_queue == NULL && CPU->burst == 0) { // ÇÁ·Î¼¼½º°¡ ´Ù ³¡³µÀ¸¸é ÇÁ·Î¼¼½º ³¡³­ ÇöÀç ½Ã°£(tick)ÀúÀå ÈÄ ÇÁ·Î±×·¥ Á¾·á
+        if (_ready_queue == NULL && CPU->burst == 0) { // í”„ë¡œì„¸ìŠ¤ê°€ ë‹¤ ëë‚¬ìœ¼ë©´ í”„ë¡œì„¸ìŠ¤ ëë‚œ í˜„ì¬ ì‹œê°„(tick)ì €ì¥ í›„ í”„ë¡œê·¸ë¨ ì¢…ë£Œ
             struct Queue* location = search(process_list, CPU);
-            if(location->finish == -1) // Áßº¹ÀúÀå ¹æÁö
+            if(location->finish == -1) // ì¤‘ë³µì €ì¥ ë°©ì§€
                 location->finish = _tick;
 
             struct Queue* location2 = process_list;
             while (location2 != NULL) {
-                if (location2->finish == -1) { // CPU¿¡ ÇÒ´çµÈ ÇÁ·Î¼¼½º°¡ ´Ù ³¡³µ°í ready_queue¿¡µµ ÇÁ·Î¼¼½º°¡ ¾øÀ¸¸é ¸ğµç ÇÁ·Î¼¼½º°¡ Á¾·áµÆ´Ù°í »ı°¢ÇÒÁö ¸ğ¸£Áö¸¸ ÅØ½ºÆ® ÆÄÀÏ¿¡ ÀÖ´Â ¸ğµç ÇÁ·Î¼¼½º°¡ ´Ù ³¡³­°Ô ¾Æ´Ï¶ó¸é ÇÁ·Î±×·¥ °è¼ÓÇØ¼­ ¼öÇà
+                if (location2->finish == -1) { // CPUì— í• ë‹¹ëœ í”„ë¡œì„¸ìŠ¤ê°€ ë‹¤ ëë‚¬ê³  ready_queueì—ë„ í”„ë¡œì„¸ìŠ¤ê°€ ì—†ìœ¼ë©´ ëª¨ë“  í”„ë¡œì„¸ìŠ¤ê°€ ì¢…ë£Œëë‹¤ê³  ìƒê°í• ì§€ ëª¨ë¥´ì§€ë§Œ í…ìŠ¤íŠ¸ íŒŒì¼ì— ìˆëŠ” ëª¨ë“  í”„ë¡œì„¸ìŠ¤ê°€ ë‹¤ ëë‚œê²Œ ì•„ë‹ˆë¼ë©´ í”„ë¡œê·¸ë¨ ê³„ì†í•´ì„œ ìˆ˜í–‰
                     return 1;
                 }
                 else {
@@ -363,15 +362,15 @@ int end_processing(struct Queue* _ready_queue, int _tick) {
                 }
             }
             printf("[tick: %02d] All processes are terminated.\n\n", _tick);
-            return 0; // ÇÁ·Î±×·¥ Á¾·á
+            return 0; // í”„ë¡œê·¸ë¨ ì¢…ë£Œ
         }
     } 
     return 1;
 }
 
-// process_list, ready_queue, CPU¿¡ µ¿ÀûÇÒ´çÇÑ °Íµé ÇØÀçÇØÁÖ´Â ÇÔ¼ö
+// process_list, ready_queue, CPUì— ë™ì í• ë‹¹í•œ ê²ƒë“¤ í•´ì¬í•´ì£¼ëŠ” í•¨ìˆ˜
 void free_var() {
-    struct Queue* location = process_list; // process_list µ¿Àû ÇÒ´ç ÇØÁ¦
+    struct Queue* location = process_list; // process_list ë™ì  í• ë‹¹ í•´ì œ
     struct Queue* pre;
     do {
         pre = location;
@@ -381,7 +380,7 @@ void free_var() {
             free(pre);
     } while (location != NULL);
 
-    location = ready_queue; // ready_queue µ¿Àû ÇÒ´ç ÇØÁ¦
+    location = ready_queue; // ready_queue ë™ì  í• ë‹¹ í•´ì œ
     do {
         pre = location;
         if (location != NULL)
@@ -390,7 +389,7 @@ void free_var() {
             free(pre);
     } while (location != NULL);
 
-    location = CPU; // CPU µ¿Àû ÇÒ´ç ÇØÁ¦
+    location = CPU; // CPU ë™ì  í• ë‹¹ í•´ì œ
     do {
         pre = location;
         if (location != NULL)
@@ -400,7 +399,7 @@ void free_var() {
     } while (location != NULL);
 }
 
-// string.h¿¡ ÀÖ´Â strtok ÇÔ¼ö ±¸Çö, strÀ» delimiters ±âÁØÀ¸·Î ¸ğµÎ Àß¶ó³½´Ù.
+// string.hì— ìˆëŠ” strtok í•¨ìˆ˜ êµ¬í˜„, strì„ delimiters ê¸°ì¤€ìœ¼ë¡œ ëª¨ë‘ ì˜ë¼ë‚¸ë‹¤.
 char* my_strtok(char* str, const char* delimiters) {
     static char* pCurrent;
     char* pDelimit;
@@ -408,9 +407,9 @@ char* my_strtok(char* str, const char* delimiters) {
     if (str != NULL)pCurrent = str;
     else str = pCurrent;
 
-    if (*pCurrent == NULL) return NULL; // strÀÌ NULLÀÌ¸é NULL¹İÈ¯
+    if (*pCurrent == NULL) return NULL; // strì´ NULLì´ë©´ NULLë°˜í™˜
 
-    //¹®ÀÚ¿­ Á¡°Ë
+    //ë¬¸ìì—´ ì ê²€
     while (*pCurrent)
     {
         pDelimit = (char*)delimiters;
@@ -425,6 +424,6 @@ char* my_strtok(char* str, const char* delimiters) {
         }
         ++pCurrent;
     }
-    // ´õÀÌ»ó ÀÚ¸¦ ¼ö ¾ø´Ù¸é NULL¹İÈ¯
+    // ë”ì´ìƒ ìë¥¼ ìˆ˜ ì—†ë‹¤ë©´ NULLë°˜í™˜
     return str;
 }
